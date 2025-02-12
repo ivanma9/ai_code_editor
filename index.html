@@ -38,11 +38,9 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.5.0/semantic.min.css" integrity="sha512-KXol4x3sVoO+8ZsWPFI/r5KBVB/ssCGB5tsv2nVOKwLg33wTFP3fmnXa47FdSVIshVTgsYk/1734xSk9aFIa4A==" crossorigin="anonymous" referrerpolicy="no-referrer">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.5.0/semantic.min.js" integrity="sha512-Xo0Jh8MsOn72LGV8kU5LsclG7SUzJsWGhXbWcYs2MAmChkQzwiW/yTQwdJ8w6UA9C6EVG18GHb/TrYpYCjyAQw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 
-    <script type="module" src="js/ai.js"></script>
     <script type="module" src="js/electron.js"></script>
     <script type="module" src="js/ide.js"></script>
     <script type="module" src="js/local_storage.js"></script>
-    <script type="module" src="js/puter.js"></script>
     <script type="module" src="js/query.js"></script>
     <script type="module" src="js/style.js"></script>
     <script type="module" src="js/theme.js"></script>
@@ -177,46 +175,6 @@
         </div>
     </div>
 
-    <div id="judge0-chat-container" class="ui segment">
-        <div class="ui top attached borderless menu">
-            <div class="item">
-                <div class="ui toggle checked checkbox">
-                    <input id="judge0-inline-suggestions" type="checkbox" checked="">
-                    <label>Inline Suggestions</label>
-                </div>
-            </div>
-            <div class="right menu">
-                <div class="fitted item">
-                    <select id="judge0-chat-model-select" class="ui search selection dropdown item">
-                        <option>gpt-4o-mini</option>
-                        <option>gpt-4o</option>
-                        <option>o3-mini</option>
-                        <option>o1-mini</option>
-                        <option>claude-3-5-sonnet</option>
-                        <option>deepseek-chat</option>
-                        <option>deepseek-reasoner</option>
-                        <option>meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo</option>
-                        <option>meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo</option>
-                        <option>meta-llama/Meta-Llama-3.1-405B-Instruct-Turbo</option>
-                        <option>mistral-large-latest</option>
-                        <option>pixtral-large-latest</option>
-                        <option>codestral-latest</option>
-                        <option>google/gemma-2-27b-it</option>
-                        <option>grok-beta</option>
-                    </select>
-                </div>
-            </div>
-        </div>
-        <div id="judge0-chat-messages"></div>
-        <div id="judge0-chat-input-container" class="ui basic segment">
-            <form id="judge0-chat-form" class="ui fluid action input">
-                <input id="judge0-chat-user-input" type="text">
-                <button id="judge0-chat-send-button" class="ui primary icon button" type="submit">
-                    <i class="arrow up icon"></i>
-                </button>
-            </form>
-        </div>
-    </div>
 
     <div id="judge0-status-line" class="ui bottom right attached mini label"></div>
 

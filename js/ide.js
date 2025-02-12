@@ -1,4 +1,5 @@
 import { usePuter } from "./puter.js";
+import { createChatComponent } from './ChatComponent.js';
 
 const API_KEY = ""; // Get yours at https://platform.sulu.sh/apis/judge0
 
@@ -576,7 +577,7 @@ document.addEventListener("DOMContentLoaded", async function () {
 
             monaco.languages.registerInlineCompletionsProvider('*', {
                 provideInlineCompletions: async (model, position) => {
-                    if (!puter.auth.isSignedIn() || !document.getElementById("judge0-inline-suggestions").checked) {
+                    if (!document.getElementById("judge0-inline-suggestions").checked) {
                         return;
                     }
 
@@ -672,7 +673,23 @@ document.addEventListener("DOMContentLoaded", async function () {
         });
 
         layout.registerComponent("ai", function (container, state) {
-            container.getElement()[0].appendChild(document.getElementById("judge0-chat-container"));
+            const initChat = async () => {
+                try {
+                    await loadLangauges();
+                    const language = await getSelectedLanguage();
+                    
+                    if (language) {
+                        const chatComponent = createChatComponent('ai', sourceEditor, stdinEditor, stdoutEditor, language);
+                        if (chatComponent) {
+                            container.getElement()[0].appendChild(chatComponent);
+                        }
+                    }
+                } catch (error) {
+                    console.error("Error initializing chat:", error);
+                }
+            };
+
+            layout.on("initialised", initChat);
         });
 
         layout.on("initialised", function () {
