@@ -43,7 +43,6 @@ export function createChatComponent(id, getContext, requestBody) {
             </form>
         </div>
     `;
-    console.log("after chatContainer.innerHTML");
 
     // Get form element after it's created in the DOM
     const form = chatContainer.querySelector(`#judge0-chat-form-${id}`);
@@ -52,8 +51,6 @@ export function createChatComponent(id, getContext, requestBody) {
     const modelSelect = chatContainer.querySelector(`#judge0-chat-model-select-${id}`);
 
     modelSelect.style.color = 'white';
-
-    console.log("after modelSelect");
 
 
     // Add event listener for form submission
@@ -99,7 +96,6 @@ export function createChatComponent(id, getContext, requestBody) {
             language: language,
             systemPrompt: requestBody.system
         };
-        console.log("model", models[aiContext.selectedModel]);
 
         const body = {
             "model": models[aiContext.selectedModel] || "microsoft/phi-3-mini-128k-instruct:free",
@@ -121,7 +117,6 @@ Question: ${aiContext.question}`
             ]
         }
 
-        console.log(body);
 
         try {
             const data = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -137,7 +132,6 @@ Question: ${aiContext.question}`
 
             const response = await data.json();
             const content = response?.choices[0]?.message?.content || 'Sorry, I encountered an error processing your request.';
-            console.log("response content", content);
             // AI message with VS Code-like colors
             const aiMessage = document.createElement('div');
             aiMessage.className = 'ui message';
@@ -151,15 +145,12 @@ Question: ${aiContext.question}`
 
             // Parse and format the content
             const parts = content.split(/(```[\s\S]*?```)/);
-            console.log("number of parts", parts.length);
             parts.forEach(part => {
                 if (part.startsWith('```')) {
-                    console.log("part", part);
                     // Extract language and code
                     const match = part.match(/```(\w+)?\n([\s\S]*?)```/);
                     if (match) {
                         const [_, language, code] = match;
-                        console.log("match", code);
                         
                         const codeContainer = document.createElement('div');
                         codeContainer.style.height = '200px';
@@ -224,7 +215,6 @@ Question: ${aiContext.question}`
         }
     });
 
-    console.log("after form.addEventListener");
 
 
     return chatContainer;

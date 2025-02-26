@@ -817,7 +817,6 @@ document.addEventListener("DOMContentLoaded", async function () {
             // Export these methods to be used globally
             window.editorUtils = {
                 switchToDiffEditor: (originalCode, modifiedCode, language) => {
-                    console.log("switching to diff editor");
                     if (sourceEditor) {
                         sourceEditor.dispose();
                     }
@@ -836,16 +835,11 @@ document.addEventListener("DOMContentLoaded", async function () {
 
                     // Setup diff editor UI components (buttons, etc.)
                     setupDiffEditorUI(container.getElement()[0], originalModel, modifiedModel);
-                    console.log("diff editor created");
                     
                     return sourceEditor.getModifiedEditor();
                 },
 
                 switchToStandardEditor: (content, language) => {
-                    console.log("switching to standard editor");
-                    //log content and language
-                    console.log("content:", content);
-                    console.log("language:", language);
                     if (sourceEditor) {
                         // If it's a diff editor, we need to dispose of both models
                         if (currentEditorType === 'diff') {
@@ -909,10 +903,8 @@ document.addEventListener("DOMContentLoaded", async function () {
         layout.registerComponent("ai", function (container, state) {
             const initChat = async () => {
                 try {
-                    console.log("Starting initChat");
                     await loadLangauges();
                     const language = await getSelectedLanguage();
-                    console.log("Got language:", language);
                     
                     if (language) {
                         // Create a function to get the latest context
@@ -930,14 +922,11 @@ document.addEventListener("DOMContentLoaded", async function () {
                             }
                         };
                         
-                        console.log("Container element:", container.getElement()[0]);
                         // Pass the getLatestContext function instead of a static context
                         const chatComponent = createChatComponent('ai', getLatestContext, requestBody);
-                        console.log("Created chatComponent:", chatComponent);
                         
                         if (chatComponent) {
                             container.getElement()[0].appendChild(chatComponent);
-                            console.log("Appended chatComponent to container");
                         }
                     }
                 } catch (error) {
@@ -1230,9 +1219,7 @@ function getEditorLanguageMode(languageName) {
         "Visual Basic": "vb"
     }
 
-    for (let key in LANGUAGE_NAME_TO_LANGUAGE_EDITOR_MODE) {
-        console.log("key:", key?.toLowerCase())
-        console.log("languageName:", languageName?.toLowerCase())
+    for (let key in LANGUAGE_NAME_TO_LANGUAGE_EDITOR_MODE) {    
         if (languageName?.toLowerCase().startsWith(key?.toLowerCase())) {
             return LANGUAGE_NAME_TO_LANGUAGE_EDITOR_MODE[key];
         }
@@ -1336,7 +1323,6 @@ function setupDiffEditorUI(container, originalModel, modifiedModel) {
         window.editorUtils.switchToStandardEditor(originalCode, originalModel.getLanguageId());
         actionsContainer.remove();
     };
-    console.log("actionsContainer:", actionsContainer)
 
     actionsContainer.appendChild(acceptButton);
     actionsContainer.appendChild(rejectButton);
