@@ -1,18 +1,18 @@
 import { config } from './config.js';
+import { createDiffEditor } from './diffEditor.js';
+import { marked } from 'https://cdn.jsdelivr.net/npm/marked/lib/marked.esm.js';
+
 
 // model : openrouter model name
 const models = {
-    "gpt-4o-mini": "gpt-4o-mini",
     "nvidia/llama-3.1-nemotron": "nvidia/llama-3.1-nemotron-70b-instruct:free",
-    "microsoft/phi-3": "microsoft/phi-3-mini-128k-instruct:free"
+    "microsoft/phi-3": "microsoft/phi-3-mini-128k-instruct:free",
+    "google/gemma-2-27b-it": "google/gemini-2.0-flash-thinking-exp:free"
 }
 
-export function createChatComponent(id, sourceEditor, stdinEditor, stdoutEditor, language) {
-    console.log("createChatComponent", id, sourceEditor, stdinEditor, stdoutEditor);
-    console.log(sourceEditor.getValue());
-    console.log(stdinEditor.getValue());
-    console.log(stdoutEditor.getValue());
-    console.log(language);
+export function createChatComponent(id, getContext, requestBody) {
+
+    const language = getContext().language;
     const chatContainer = document.createElement('div');
     chatContainer.id = `chat-container-${id}`;
     chatContainer.className = 'ui segment';
@@ -43,6 +43,7 @@ export function createChatComponent(id, sourceEditor, stdinEditor, stdoutEditor,
             </form>
         </div>
     `;
+    console.log("after chatContainer.innerHTML");
 
     // Get form element after it's created in the DOM
     const form = chatContainer.querySelector(`#judge0-chat-form-${id}`);
@@ -51,6 +52,9 @@ export function createChatComponent(id, sourceEditor, stdinEditor, stdoutEditor,
     const modelSelect = chatContainer.querySelector(`#judge0-chat-model-select-${id}`);
 
     modelSelect.style.color = 'white';
+
+    console.log("after modelSelect");
+
 
     // Add event listener for form submission
     form.addEventListener("submit", async function (event) {
@@ -61,39 +65,65 @@ export function createChatComponent(id, sourceEditor, stdinEditor, stdoutEditor,
             return;
         }
 
-        // Get current editor values
-        const sourceCode = sourceEditor.getValue();
-        const stdin = stdinEditor.getValue();
-        const stdout = stdoutEditor.getValue();
+        // Get current editor values by calling the context function
+        const context = getContext();
+        const sourceCode = context.sourceCode;
+        const stdin = context.stdin;
+        const stdout = context.stdout;
 
         // Add user message with VS Code-like colors
         const messageDiv = document.createElement('div');
         messageDiv.className = 'ui message';
         messageDiv.style.marginLeft = 'auto';
         messageDiv.style.maxWidth = '80%';
-        messageDiv.style.marginBottom = '8px';
+        messageDiv.style.marginBottom = '4px';
         messageDiv.style.backgroundColor = '#007ace'; // Dark gray background
         messageDiv.style.color = '#ffffff'; // White text
         messageDiv.style.border = '1px solid #007aca'; // Blue border (VSCode's signature blue)
         messageDiv.textContent = userInputValue;
+        messageDiv.style.fontSize = '12px';
         messagesContainer.appendChild(messageDiv);
+        
 
         // Clear input and scroll to bottom
         input.value = "";
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
 
         // Prepare context for AI
-        const context = {
+        const aiContext = {
             sourceCode,
             stdin,
             stdout,
             question: userInputValue,
             selectedModel: modelSelect.value,
-            language: language
+            language: language,
+            systemPrompt: requestBody.system
         };
+        console.log("model", models[aiContext.selectedModel]);
+
+        const body = {
+            "model": models[aiContext.selectedModel] || "microsoft/phi-3-mini-128k-instruct:free",
+            "messages": [
+                aiContext.systemPrompt,
+                {
+                    "role": "user",
+                    "content": `Given the following context:
+Source code in ${context.language}:
+\`\`\`${context.languageMode || 'Unknown'}
+${sourceCode}
+\`\`\`
+
+Stdin: ${stdin}
+Stdout: ${stdout}
+
+Question: ${aiContext.question}`
+                }
+            ]
+        }
+
+        console.log(body);
 
         try {
-            console.log(config.OPENROUTER_API_KEY);
             const data = await fetch("https://openrouter.ai/api/v1/chat/completions", {
                 method: "POST",
                 headers: {
@@ -102,43 +132,78 @@ export function createChatComponent(id, sourceEditor, stdinEditor, stdoutEditor,
                     "HTTP-Referer": window.location.href, // Required by OpenRouter
                     "X-Title": "Judge0 Chat" // Recommended by OpenRouter
                 },
-                body: JSON.stringify({
-                    "model": "microsoft/phi-3-mini-128k-instruct:free",
-                    "messages": [
-                        {
-                            "role": "system",
-                            "content": "You are a helpful coding assistant. You help users understand and debug their code."
-                        },
-                        {
-                            "role": "user",
-                            "content": `Given the following context:
-Source code:
-\`\`\`${context.language?.name || 'Unknown'}
-${sourceCode}
-\`\`\`
-
-Stdin: ${stdin}
-Stdout: ${stdout}
-
-Question: ${userInputValue}`
-                        }
-                    ]
-                })
+                body: JSON.stringify(body)
             });
 
             const response = await data.json();
             const content = response?.choices[0]?.message?.content || 'Sorry, I encountered an error processing your request.';
-
+            console.log("response content", content);
             // AI message with VS Code-like colors
             const aiMessage = document.createElement('div');
             aiMessage.className = 'ui message';
             aiMessage.style.marginRight = 'auto';
             aiMessage.style.maxWidth = '80%';
-            aiMessage.style.marginBottom = '8px';
-            aiMessage.style.backgroundColor = '#3d3d3d'; // Slightly lighter gray for AI
-            aiMessage.style.color = '#ffffff'; // White text
-            aiMessage.style.border = '1px solid #3d3d3d'; // Lighter blue border
-            aiMessage.textContent = content;
+            aiMessage.style.marginBottom = '4px';
+            aiMessage.style.backgroundColor = '#3d3d3d';
+            aiMessage.style.color = '#ffffff';
+            aiMessage.style.border = '1px solid #3d3d3d';
+            aiMessage.style.fontSize = '12px';
+
+            // Parse and format the content
+            const parts = content.split(/(```[\s\S]*?```)/);
+            console.log("number of parts", parts.length);
+            parts.forEach(part => {
+                if (part.startsWith('```')) {
+                    console.log("part", part);
+                    // Extract language and code
+                    const match = part.match(/```(\w+)?\n([\s\S]*?)```/);
+                    if (match) {
+                        const [_, language, code] = match;
+                        console.log("match", code);
+                        
+                        const codeContainer = document.createElement('div');
+                        codeContainer.style.height = '200px';
+                        
+                        // Create Monaco editor for the code
+                        const editor = monaco.editor.create(codeContainer, {
+                            value: code,
+                            language: language || 'plaintext',
+                            readOnly: true,
+                            minimap: { enabled: false },
+                            scrollBeyondLastLine: false,
+                            automaticLayout: true,
+                            fontSize: 10
+                        });
+
+                        aiMessage.appendChild(codeContainer);
+
+                        
+                        if (id === 'composer') {
+                            // Create diff editor for composer, regular editor for others
+                            const diffContainer = document.createElement('div');
+                            diffContainer.style.height = '300px';
+                            diffContainer.style.marginTop = '20px';
+                            diffContainer.style.marginBottom = '20px';
+                            const diffEditor = createDiffEditor(
+                                context.sourceCode,
+                                code,
+                                language,
+                                diffContainer
+                            );
+
+                            aiMessage.appendChild(diffContainer);
+                        }
+                    }
+                } else if (part.trim()) {
+                    // Use marked to parse regular text
+                    const textNode = document.createElement('div');
+                    textNode.style.marginBottom = '10px';
+                    textNode.style.whiteSpace = 'pre-wrap';
+                    textNode.innerHTML = marked.parse(part.trim());
+                    aiMessage.appendChild(textNode);
+                }
+            });
+
             messagesContainer.appendChild(aiMessage);
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
         } catch (error) {
@@ -149,7 +214,7 @@ Question: ${userInputValue}`
             aiMessage.className = 'ui message';
             aiMessage.style.marginRight = 'auto';
             aiMessage.style.maxWidth = '80%';
-            aiMessage.style.marginBottom = '8px';
+            aiMessage.style.marginBottom = '4px';
             aiMessage.style.backgroundColor = '#3d3d3d'; // Slightly lighter gray for AI
             aiMessage.style.color = '#ffffff'; // White text
             aiMessage.style.border = '1px solid #3d3d3d'; // Lighter blue border
@@ -158,6 +223,9 @@ Question: ${userInputValue}`
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
         }
     });
+
+    console.log("after form.addEventListener");
+
 
     return chatContainer;
 }

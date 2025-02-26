@@ -1,3 +1,4 @@
+import { config } from './config.js';
 import { usePuter } from "./puter.js";
 import { createChatComponent } from './ChatComponent.js';
 
@@ -32,7 +33,9 @@ var fontSize = 13;
 
 var layout;
 
-export var sourceEditor;
+export var sourceEditor = null;
+export var currentEditorType = 'standard'; // or 'diff'
+
 var stdinEditor;
 var stdoutEditor;
 
@@ -67,15 +70,27 @@ var layoutConfig = {
         }, {
             type: "column",
             content: [{
-                type: "component",
                 height: 66,
-                componentName: "ai",
-                id: "ai",
-                title: "AI Assistant",
-                isClosable: false,
-                componentState: {
-                    readOnly: false
-                }
+                type: "stack",
+                content: [{
+                    type: "component",
+                    componentName: "ai",
+                    id: "ai",
+                    title: "AI Assistant",
+                    isClosable: false,
+                    componentState: {
+                        readOnly: false
+                    }
+                }, {
+                    type: "component",
+                    componentName: "composer",
+                    id: "composer",
+                    title: "AI Composer",
+                    isClosable: false,
+                    componentState: {
+                        readOnly: false
+                    }
+                }]
             }, {
                 type: "stack",
                 content: [
@@ -562,7 +577,7 @@ document.addEventListener("DOMContentLoaded", async function () {
         layout = new GoldenLayout(layoutConfig, $("#judge0-site-content"));
 
         layout.registerComponent("source", function (container, state) {
-            sourceEditor = monaco.editor.create(container.getElement()[0], {
+            const editorConfig = {
                 automaticLayout: true,
                 scrollBeyondLastLine: true,
                 readOnly: state.readOnly,
@@ -570,80 +585,299 @@ document.addEventListener("DOMContentLoaded", async function () {
                 fontFamily: "JetBrains Mono",
                 minimap: {
                     enabled: true
-                }
-            });
-
-            sourceEditor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, run);
-
-            monaco.languages.registerInlineCompletionsProvider('*', {
-                provideInlineCompletions: async (model, position) => {
-                    if (!document.getElementById("judge0-inline-suggestions").checked) {
-                        return;
-                    }
-
-                    const textBeforeCursor = model.getValueInRange({
-                        startLineNumber: 1,
-                        startColumn: 1,
-                        endLineNumber: position.lineNumber,
-                        endColumn: position.column
-                    });
-
-                    const textAfterCursor = model.getValueInRange({
-                        startLineNumber: position.lineNumber,
-                        startColumn: position.column,
-                        endLineNumber: model.getLineCount(),
-                        endColumn: model.getLineMaxColumn(model.getLineCount())
-                    });
-
-                    const aiResponse = await puter.ai.chat([{
-                        role: "user",
-                        content: `You are a code completion assistant. Given the following context, generate the most likely code completion.
-
-                    ### Code Before Cursor:
-                    ${textBeforeCursor}
-
-                    ### Code After Cursor:
-                    ${textAfterCursor}
-
-                    ### Instructions:
-                    - Predict the next logical code segment.
-                    - Ensure the suggestion is syntactically and contextually correct.
-                    - Keep the completion concise and relevant.
-                    - Do not repeat existing code.
-                    - Provide only the missing code.
-                    - **Respond with only the code, without markdown formatting.**
-                    - **Do not include triple backticks (\`\`\`) or additional explanations.**
-
-                    ### Completion:`.trim()
-                    }], {
-                        model: document.getElementById("judge0-chat-model-select").value,
-                    });
-
-                    let aiResponseValue = aiResponse?.toString().trim() || "";
-
-                    if (Array.isArray(aiResponseValue)) {
-                        aiResponseValue = aiResponseValue.map(v => v.text).join("\n").trim();
-                    }
-
-                    if (!aiResponseValue || aiResponseValue.length === 0) {
-                        return;
-                    }
-
-                    return {
-                        items: [{
-                            insertText: aiResponseValue,
-                            range: new monaco.Range(
-                                position.lineNumber,
-                                position.column,
-                                position.lineNumber,
-                                position.column
-                            )
-                        }]
-                    };
                 },
-                handleItemDidShow: () => { },
-                freeInlineCompletions: () => { }
-            });
+                inlineCompletionsOptions: {
+                    enabled: true,
+                    showToolbar: 'always',
+                    mode: 'subword'
+                },
+                suggest: {
+                    preview: true,
+                    showStatusBar: true,
+                    showInlineDetails: true,
+                    snippetsPreventQuickSuggestions: false,
+                    showIcons: true,
+                    showMethods: true,
+                    showFunctions: true,
+                    showConstructors: true,
+                    filterGraceful: false,
+                    localityBonus: true,
+                    shareSuggestSelections: true,
+                    previewMode: 'prefix',
+                    insertMode: 'insert',
+                    snippetSuggestions: 'inline',
+                    suggestOnTriggerCharacters: true,
+                    acceptSuggestionOnEnter: 'on',
+                    selectionMode: 'always',
+                    showDeprecated: false,
+                    matchOnWordStartOnly: false,
+                    maxVisibleSuggestions: 12,
+                    hideSuggestionsOnType: false
+                },
+                quickSuggestions: {
+                    other: "on",
+                    comments: "on",
+                    strings: "on"
+                },
+                parameterHints: {
+                    enabled: true,
+                    cycle: true
+                },
+                hover: {
+                    enabled: true,
+                    delay: 300
+                },
+                tabCompletion: 'on',
+                wordBasedSuggestions: 'matchingDocuments',
+                suggestSelection: 'first',
+                suggestFontSize: 14,
+                suggestLineHeight: 24,
+            };
+            function createStandardEditor() {
+                const editor = monaco.editor.create(container.getElement()[0], editorConfig);
+                
+                editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, run);
+                currentEditorType = 'standard';
+
+                // Register the inline suggestions provider with the required freeInlineCompletions method
+                let debounceTimeout = null;
+                const debounce = (fn, delay) => {
+                    return (...args) => {
+                        return new Promise((resolve) => {
+                            if (debounceTimeout) {
+                                clearTimeout(debounceTimeout);
+                            }
+                            // Shorter delay while actively typing
+                            const currentDelay = args[0].isTyping ? 500 : delay;
+                            debounceTimeout = setTimeout(async () => {
+                                resolve(await fn(...args));
+                            }, currentDelay);
+                        });
+                    };
+                };
+
+                const getCompletion = debounce(async (model, position, context) => {
+                    try {
+                        // Get surrounding context (5 lines before and after)
+                        let contextLines = [];
+                        const startLine = Math.max(1, position.lineNumber - 5);
+                        const endLine = Math.min(model.getLineCount(), position.lineNumber + 5);
+                        
+                        for (let i = startLine; i <= endLine; i++) {
+                            const line = model.getLineContent(i).trim();
+                            if (line) {
+                                contextLines.push(line);
+                            }
+                        }
+                        
+                        const context = contextLines.join('\n');
+
+                        // Get the current line's content up to the cursor
+                        const currentLineContent = model.getLineContent(position.lineNumber)
+                            .substring(0, position.column - 1);
+
+                        // Track if user is actively typing
+                        const isTyping = context.lastModifiedTime && 
+                            (Date.now() - context.lastModifiedTime < 1000);
+
+                        // Call OpenRouter API for code completion
+                        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': 'Bearer ' + config.OPENROUTER_API_KEY,
+                                'HTTP-Referer': window.location.href,
+                                'X-Title': 'Judge0 Autocomplete'
+                            },
+                            body: JSON.stringify({
+                                model: 'google/gemini-2.0-flash-lite-preview-02-05:free',
+                                messages: [
+                                    {
+                                        role: 'system',
+                                        content: `You are a code completion assistant. Complete the code based on the current context and partial input. 
+                                        If the user is actively typing (${isTyping}), provide shorter, partial completions.
+                                        Focus on completing the current statement or block. Do not repeat existing code. Do not include markdown code fences or any language of the code. Just provide the raw code completion suggestions. For example, if the code is in C++, do not include the language of the code. Just provide the raw code completion suggestions. Also do not include the /\`\`\`/ or \`\`\` language of the code. Just provide the raw code completion suggestions. Do not repeat existing code.`
+                                    },
+                                    {
+                                        role: 'user',
+                                        content: `Complete this line of code: ${currentLineContent}
+                                        Context:\n${context}`
+                                    }
+                                ],
+                                temperature: isTyping ? 0.3 : 0.7, // Lower temperature while typing for more focused completions
+                                max_tokens: isTyping ? 20 : 50    // Shorter completions while typing
+                            })
+                        });
+
+                        return await response.json();
+                    } catch (error) {
+                        console.error('Error getting completion:', error);
+                        return null;
+                    }
+                }, 2000); // 2 second default debounce
+
+                const disposable = monaco.languages.registerInlineCompletionsProvider('*', {
+                    async provideInlineCompletions(model, position, context, token) {
+                        try {
+                            const data = await getCompletion(model, position, context);
+                            if (!data) {
+                                return { items: [], dispose: () => {} };
+                            }
+
+                            let completion = data.choices[0]?.message?.content || '';
+
+                            if (!completion) {
+                                console.log("No completion found");
+                                return { items: [], dispose: () => {} };
+                            }
+
+                            // Clean up the completion output
+                            completion = completion
+                                .replace(/```.*?\n/g, '') // Remove opening code fence with language
+                                .replace(/```/g, '')      // Remove closing code fence
+                                .replace(/^\s+|\s+$/g, ''); // Trim whitespace
+
+                            // Get the current line's content up to the cursor
+                            const currentLineContent = model.getLineContent(position.lineNumber)
+                                .substring(0, position.column - 1);
+
+                            // If the current line already contains the start of the completion,
+                            // remove it from the completion to avoid duplication
+                            if (completion.startsWith(currentLineContent.trim())) {
+                                completion = completion.substring(currentLineContent.trim().length);
+                            }
+                            
+
+                            const range = {
+                                startLineNumber: position.lineNumber,
+                                startColumn: position.column,
+                                endLineNumber: position.lineNumber,
+                                endColumn: position.column + completion.length
+                            };
+
+                            console.log("Providing completion:", {
+                                completion,
+                                context,
+                                range,
+                                position: {
+                                    lineNumber: position.lineNumber,
+                                    column: position.column
+                                }
+                            });
+
+                            return {
+                                items: [{
+                                    insertText: completion,
+                                    range: range
+                                }],
+                                dispose: () => {}
+                            };
+                        } catch (error) {
+                            console.error('Error getting inline completions:', error);
+                            return { items: [], dispose: () => {} };
+                        }
+                    },
+                    
+                    freeInlineCompletions(completions) {
+                        if (completions?.dispose) {
+                            completions.dispose();
+                        }
+                    }
+                });
+
+                editor.onDidDispose(() => {
+                    disposable.dispose();
+                });
+
+                return editor;
+            }
+
+            function createDiffEditor() {
+                const editor = monaco.editor.createDiffEditor(container.getElement()[0], {
+                    automaticLayout: true,
+                    scrollBeyondLastLine: true,
+                    fontFamily: "JetBrains Mono",
+                    minimap: {
+                        enabled: false
+                    },
+                    enableSplitViewResizing: true,
+                    renderOverviewRuler: false,
+                    renderSideBySide: false,
+                    diffCodeLens: true,
+                    diffWordWrap: "off",
+                    readOnly: false
+                });
+                currentEditorType = 'diff';
+                return editor;
+            }
+
+            // Initial creation of standard editor
+            sourceEditor = createStandardEditor();
+
+            // Export these methods to be used globally
+            window.editorUtils = {
+                switchToDiffEditor: (originalCode, modifiedCode, language) => {
+                    console.log("switching to diff editor");
+                    if (sourceEditor) {
+                        sourceEditor.dispose();
+                    }
+                    sourceEditor = createDiffEditor();
+                    
+                    const originalModel = monaco.editor.createModel(originalCode, language);
+                    const modifiedModel = monaco.editor.createModel(modifiedCode, language);
+                    
+                    originalModel.updateOptions({ readOnly: true });
+                    modifiedModel.updateOptions({ readOnly: true });
+                    
+                    sourceEditor.setModel({
+                        original: originalModel,
+                        modified: modifiedModel
+                    });
+
+                    // Setup diff editor UI components (buttons, etc.)
+                    setupDiffEditorUI(container.getElement()[0], originalModel, modifiedModel);
+                    console.log("diff editor created");
+                    
+                    return sourceEditor.getModifiedEditor();
+                },
+
+                switchToStandardEditor: (content, language) => {
+                    console.log("switching to standard editor");
+                    //log content and language
+                    console.log("content:", content);
+                    console.log("language:", language);
+                    if (sourceEditor) {
+                        // If it's a diff editor, we need to dispose of both models
+                        if (currentEditorType === 'diff') {
+                            const models = sourceEditor.getModel();
+                            if (models) {
+                                models.original.dispose();
+                                models.modified.dispose();
+                            }
+                        }
+                        sourceEditor.dispose();
+                    }
+                    
+                    sourceEditor = createStandardEditor();
+                    
+                    if (content) {
+                        sourceEditor.setValue(content);
+                    }
+                    if (language) {
+                        const languageMode = getEditorLanguageMode(language.name);
+                        monaco.editor.setModelLanguage(sourceEditor.getModel(), languageMode);
+                    }
+                    
+                    return sourceEditor;
+                },
+
+                getCurrentEditor: () => {
+                    if (currentEditorType === 'diff') {
+                        return sourceEditor.getModifiedEditor();
+                    }
+                    return sourceEditor;
+                }
+            };
         });
 
         layout.registerComponent("stdin", function (container, state) {
@@ -675,13 +909,35 @@ document.addEventListener("DOMContentLoaded", async function () {
         layout.registerComponent("ai", function (container, state) {
             const initChat = async () => {
                 try {
+                    console.log("Starting initChat");
                     await loadLangauges();
                     const language = await getSelectedLanguage();
+                    console.log("Got language:", language);
                     
                     if (language) {
-                        const chatComponent = createChatComponent('ai', sourceEditor, stdinEditor, stdoutEditor, language);
+                        // Create a function to get the latest context
+                        const getLatestContext = () => ({
+                            language: language,
+                            sourceCode: window.editorUtils.getCurrentEditor().getValue(),
+                            stdin: stdinEditor.getValue(),
+                            stdout: stdoutEditor.getValue(),
+                        });
+                        
+                        const requestBody = {
+                            system: {
+                                "role": "system",
+                                "content": "You are a helpful coding assistant. You help users understand and debug their code."
+                            }
+                        };
+                        
+                        console.log("Container element:", container.getElement()[0]);
+                        // Pass the getLatestContext function instead of a static context
+                        const chatComponent = createChatComponent('ai', getLatestContext, requestBody);
+                        console.log("Created chatComponent:", chatComponent);
+                        
                         if (chatComponent) {
                             container.getElement()[0].appendChild(chatComponent);
+                            console.log("Appended chatComponent to container");
                         }
                     }
                 } catch (error) {
@@ -690,6 +946,60 @@ document.addEventListener("DOMContentLoaded", async function () {
             };
 
             layout.on("initialised", initChat);
+        });
+
+        layout.registerComponent("composer", function (container, state) {
+            const initComposer = async () => {
+                try {
+                    await loadLangauges();
+                    const language = await getSelectedLanguage();
+                    const languageMode = getEditorLanguageMode(language.name);
+                    
+                    if (language) {
+                        // Create a function to get the latest context, similar to AI component
+                        const getContext = () => ({
+                            language: language,
+                            languageMode: languageMode,
+                            sourceCode: window.editorUtils.getCurrentEditor().getValue(),
+                            stdin: stdinEditor.getValue(),
+                            stdout: stdoutEditor.getValue(),
+                        });
+
+                        const requestBody = {
+                            system: {
+                                role: "system",
+                                content: `You are an expert coder. You help users understand and debug their code. We are going to try to fix the code and make it work. We will give you the code and the error message. You will be given the source code, input, and output. You will then give us the fixed code. Please return it as a working version of the source cod in raw code format. If there is an explanation for the changes please provide the explanation of the code changes AFTER the raw code.
+                                There should be 2 sections of response. The first section should be the raw code. The second section should be the explanation of the code changes. Let's think step by step. Verify your changes.
+                                
+
+                                Raw code portion:
+                                - You must maintain the layout of the file especially in languages/formats where it matters
+                                - Do NOT include markdown code fences (\`\`\`) 
+                                - Do NOT include \"Here is the updated content...\" or similar phrases
+                                - DO NOT include non-code content without explicitly commenting it out
+                                - Make sure the raw code only contains the code and nothing else.
+                                - ${language} is the language of the code. The editor that that the output is in is ${languageMode}.
+                                
+                                Explanation portion:
+                                - Keep code explanations concise and to the point.
+                                - If there are multiple changes, you can list out the changes in a list.
+                                - Make sure that the explanation is NOT in code format. It should be in some sort of text format 
+                                It should not be inbetween code blocks.
+                                If you are not sure, ask the user for clarification.`
+                            }
+                        };
+
+                        const chatComponent = createChatComponent('composer', getContext, requestBody);
+                        if (chatComponent) {
+                            container.getElement()[0].appendChild(chatComponent);
+                        }
+                    }
+                } catch (error) {
+                    console.error("Error initializing composer:", error);
+                }
+            };
+
+            layout.on("initialised", initComposer);
         });
 
         layout.on("initialised", function () {
@@ -921,7 +1231,9 @@ function getEditorLanguageMode(languageName) {
     }
 
     for (let key in LANGUAGE_NAME_TO_LANGUAGE_EDITOR_MODE) {
-        if (languageName.toLowerCase().startsWith(key.toLowerCase())) {
+        console.log("key:", key?.toLowerCase())
+        console.log("languageName:", languageName?.toLowerCase())
+        if (languageName?.toLowerCase().startsWith(key?.toLowerCase())) {
             return LANGUAGE_NAME_TO_LANGUAGE_EDITOR_MODE[key];
         }
     }
@@ -952,4 +1264,80 @@ const EXTENSIONS_TABLE = {
 
 function getLanguageForExtension(extension) {
     return EXTENSIONS_TABLE[extension] || { "flavor": CE, "language_id": 43 }; // Plain Text (https://ce.judge0.com/languages/43)
+}
+
+function setupDiffEditorUI(container, originalModel, modifiedModel) {
+    // Add styles to head if not already present
+    if (!document.getElementById('diff-editor-styles')) {
+        const style = document.createElement('style');
+        style.id = 'diff-editor-styles';
+        style.textContent = `
+            .diff-actions-container {
+                position: absolute;
+                top: 10px;
+                right: 20px;
+                z-index: 1000;
+                display: flex;
+                gap: 8px;
+                background: rgba(255, 255, 255, 0.9);
+                padding: 8px;
+                border-radius: 4px;
+                box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+            }
+            .diff-action-btn {
+                padding: 6px 12px;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 12px;
+                font-weight: 500;
+                transition: background-color 0.2s;
+            }
+            .diff-action-btn.accept {
+                background-color: #28a745;
+                color: white;
+            }
+            .diff-action-btn.accept:hover {
+                background-color: #218838;
+            }
+            .diff-action-btn.reject {
+                background-color: #dc3545;
+                color: white;
+            }
+            .diff-action-btn.reject:hover {
+                background-color: #c82333;
+            }
+
+        `;
+        document.head.appendChild(style);
+    }
+
+    // Create actions container with improved visibility
+    const actionsContainer = document.createElement('div');
+    actionsContainer.className = 'diff-actions-container';
+    container.appendChild(actionsContainer);
+
+    // Add accept button
+    const acceptButton = document.createElement('button');
+    acceptButton.textContent = 'Accept All Changes';
+    acceptButton.className = 'diff-action-btn accept';
+    acceptButton.onclick = () => {
+        const modifiedCode = modifiedModel.getValue();
+        window.editorUtils.switchToStandardEditor(modifiedCode, modifiedModel.getLanguageId());
+        actionsContainer.remove();
+    };
+
+    // Add reject button
+    const rejectButton = document.createElement('button');
+    rejectButton.textContent = 'Reject All Changes';
+    rejectButton.className = 'diff-action-btn reject';
+    rejectButton.onclick = () => {
+        const originalCode = originalModel.getValue();
+        window.editorUtils.switchToStandardEditor(originalCode, originalModel.getLanguageId());
+        actionsContainer.remove();
+    };
+    console.log("actionsContainer:", actionsContainer)
+
+    actionsContainer.appendChild(acceptButton);
+    actionsContainer.appendChild(rejectButton);
 }

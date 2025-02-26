@@ -14,6 +14,9 @@ Judge0 IDE is using [**Judge0**](https://ce.judge0.com) for executing the user's
 
 Visit https://ide.judge0.com, and enjoy happy coding. :)
 
+
+Add don't forget to add the openrouter api key to the config.js file. I put it in the js folder.
+
 ## Community
 Do you have a question, feature request, or something else on your mind? Or do you want to follow Judge0 news?
 
@@ -31,3 +34,4 @@ Thanks a lot to all [contributors](https://github.com/judge0/ide/graphs/contribu
 
 ## License
 Judge0 IDE is licensed under the [MIT License](https://github.com/judge0/ide/blob/master/LICENSE).
+
