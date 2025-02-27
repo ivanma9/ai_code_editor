@@ -1,8 +1,7 @@
 [build]
   command = "node build-config.js"
   publish = "."
-  environment = { SECRETS_SCAN_OMIT_PATHS = "js/config.js" }
 
-# Optional: Specify a Node.js version
 [build.environment]
-  NODE_VERSION = "18" 
+  NODE_VERSION = "18"
+  SECRETS_SCAN_OMIT_PATHS = "js/config.js" 
