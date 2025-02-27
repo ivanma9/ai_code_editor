@@ -1,4 +1,3 @@
-import { config } from './config.js';
 import { usePuter } from "./puter.js";
 import { createChatComponent } from './ChatComponent.js';
 
@@ -685,7 +684,7 @@ document.addEventListener("DOMContentLoaded", async function () {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
-                                'Authorization': 'Bearer ' + config.OPENROUTER_API_KEY,
+                                'Authorization': 'Bearer ' + window.appConfig?.OPENROUTER_API_KEY,
                                 'HTTP-Referer': window.location.href,
                                 'X-Title': 'Judge0 Autocomplete'
                             },

@@ -1,0 +1,7 @@
+[build]
+  command = "node build-config.js"
+  publish = "."
+
+# Optional: Specify a Node.js version
+[build.environment]
+  NODE_VERSION = "18" 

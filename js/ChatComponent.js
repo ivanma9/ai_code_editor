@@ -1,4 +1,3 @@
-import { config } from './config.js';
 import { createDiffEditor } from './diffEditor.js';
 import { marked } from 'https://cdn.jsdelivr.net/npm/marked/lib/marked.esm.js';
 
@@ -122,7 +121,7 @@ Question: ${aiContext.question}`
             const data = await fetch("https://openrouter.ai/api/v1/chat/completions", {
                 method: "POST",
                 headers: {
-                    "Authorization": `Bearer ${config.OPENROUTER_API_KEY}`,
+                    "Authorization": `Bearer ${window.appConfig?.OPENROUTER_API_KEY}`,
                     "Content-Type": "application/json",
                     "HTTP-Referer": window.location.href, // Required by OpenRouter
                     "X-Title": "Judge0 Chat" // Recommended by OpenRouter
