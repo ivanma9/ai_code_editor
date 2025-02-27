@@ -684,7 +684,7 @@ document.addEventListener("DOMContentLoaded", async function () {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
-                                'Authorization': 'Bearer ' + window.appConfig?.OPENROUTER_API_KEY,
+                                'Authorization': 'Bearer ' + window.getApiKey(),
                                 'HTTP-Referer': window.location.href,
                                 'X-Title': 'Judge0 Autocomplete'
                             },

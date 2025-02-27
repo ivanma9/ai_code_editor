@@ -121,7 +121,7 @@ Question: ${aiContext.question}`
             const data = await fetch("https://openrouter.ai/api/v1/chat/completions", {
                 method: "POST",
                 headers: {
-                    "Authorization": `Bearer ${window.appConfig?.OPENROUTER_API_KEY}`,
+                    "Authorization": `Bearer ${window.getApiKey()}`,
                     "Content-Type": "application/json",
                     "HTTP-Referer": window.location.href, // Required by OpenRouter
                     "X-Title": "Judge0 Chat" // Recommended by OpenRouter
