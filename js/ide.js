@@ -680,11 +680,12 @@ document.addEventListener("DOMContentLoaded", async function () {
                             (Date.now() - context.lastModifiedTime < 1000);
 
                         // Call OpenRouter API for code completion
+                        const apiKey = window.getApiKey();
                         const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
-                                'Authorization': 'Bearer ' + window.getApiKey(),
+                                'Authorization': 'Bearer ' + apiKey,
                                 'HTTP-Referer': window.location.href,
                                 'X-Title': 'Judge0 Autocomplete'
                             },
