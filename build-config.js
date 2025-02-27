@@ -20,7 +20,7 @@ if (!fs.existsSync(configDir)) {
 
 // Write the config to a file
 fs.writeFileSync(
-  path.join(configDir, 'config.js'), 
+  path.join(configDir, 'configProduction.js'), 
   `// Auto-generated config file - DO NOT EDIT
 window.appConfig = ${JSON.stringify(config, null, 2)};`
 );
